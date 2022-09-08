@@ -109,8 +109,8 @@ cal.setfirstweekday(calendar.SUNDAY)
 now = datetime.now()
 dates = cal.monthdatescalendar(now.year, now.month)
 
-col_w = 20
-col_h = 13
+col_w = 25
+col_h = 17
 
 cols = 7
 rows = len(dates) + 1
@@ -171,7 +171,7 @@ for x in range(cols):
     # Crop the relevant day name from our text image
     crop_region = ((crop_x, 0, crop_x + 16, 9))
     day_mask = text_mask.crop(crop_region)
-    img.paste(inky_display.WHITE, (o_x + 4, cal_y + 2), day_mask)
+    img.paste(inky_display.WHITE, (o_x + 7, cal_y + 4), day_mask)
 
     # Offset to the right side of the column and draw the vertical line
     o_x += col_w + 1
@@ -197,20 +197,23 @@ for row, week in enumerate(dates):
         # If it's the current day, invert the calendar background and text
         if (day.day, day.month) == (now.day, now.month):
             draw.rectangle((x, y, x + col_w - 1, y + col_h - 1), fill=inky_display.WHITE)
-            print_number((x + 3, y + 3), day.day, inky_display.BLACK)
+            if ( datetime(day.year, day.month, day.day).strftime("%Y-%m-%d") in holidays):
+                print_number((x + 7, y + 5), day.day, inky_display.RED)
+            else:
+                print_number((x + 7, y + 5), day.day, inky_display.BLACK)
 
         elif ( datetime(day.year, day.month, day.day).strftime("%Y-%m-%d") in holidays):
-            print_number((x + 3, y + 3), day.day, inky_display.RED)
+            print_number((x + 7, y + 5), day.day, inky_display.RED)
             
         elif ((day.month) == (now.month) and day.weekday() > 4):
-            print_number((x + 3, y + 3), day.day, inky_display.RED)
+            print_number((x + 7, y + 5), day.day, inky_display.RED)
 
 
         # If it's any other day, paint in as white if it's in the current month
         # and red if it's in the previous or next month
         elif (day.month) == (now.month):
 #            print_number((x + 3, y + 3), day.day, inky_display.WHITE if day.month == now.month else inky_display.RED)
-            print_number((x + 3, y + 3), day.day, inky_display.WHITE)
+            print_number((x + 7, y + 5), day.day, inky_display.WHITE)
 
 # Display the completed calendar on Inky pHAT
 inky_display.set_image(img)
