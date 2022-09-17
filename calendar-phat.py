@@ -95,8 +95,8 @@ def print_number(position, number, colour):
 def get_events():
     # Preparation for Google API
     SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-    calendar_id = 'hiroki.akiyama@gmail.com'
-    carendar_id_work = 'ljs562ls522uppmln7pv3pllb4@group.calendar.google.com'
+    calendar_id = 'xxxxxxxxx@group.calendar.google.com'
+    carendar_id_work = 'xxxxxxxxxxxxxxxx@group.calendar.google.com'
     gapi_creds = google.auth.load_credentials_from_file('/home/pi/pi-calendar/credentials.json', SCOPES)[0]
     service = googleapiclient.discovery.build('calendar', 'v3', credentials=gapi_creds)
 
