@@ -11,8 +11,9 @@ import google.auth
 
 from inky.auto import auto
 from PIL import Image, ImageDraw, ImageFont
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from font_fredoka_one import FredokaOne
+from pathlib import Path
 
 print("""Inky pHAT: Calendar
 
@@ -94,39 +95,67 @@ def print_number(position, number, colour):
 def get_events():
     # Preparation for Google API
     SCOPES = ['https://www.googleapis.com/auth/calendar.readonly']
-    calendar_id = 'hiroki.akiyama@gmail.com' #'ljs562ls522uppmln7pv3pllb4@group.calendar.google.com' #'hiroki.akiyama@gmail.com'
-    gapi_creds = google.auth.load_credentials_from_file('credentials.json', SCOPES)[0]
+    calendar_id = 'hiroki.akiyama@gmail.com'
+    carendar_id_work = 'ljs562ls522uppmln7pv3pllb4@group.calendar.google.com'
+    gapi_creds = google.auth.load_credentials_from_file('/home/pi/pi-calendar/credentials.json', SCOPES)[0]
     service = googleapiclient.discovery.build('calendar', 'v3', credentials=gapi_creds)
-     
+
     # Get events from Google Calendar API
     now = datetime.utcnow().isoformat() + 'Z'
     events_result = service.events().list(
          calendarId=calendar_id, timeMin=now,
-         maxResults=5, singleEvents=True,
+         maxResults=3, singleEvents=True,
          orderBy='startTime').execute()
 
+    work_events_result = service.events().list(
+         calendarId=carendar_id_work, timeMin=now,
+         maxResults=3, singleEvents=True,
+         orderBy='startTime').execute()
 
     # Pick up only start time, end time and summary info
-    events = events_result.get('items', [])
+    events = events_result.get('items', []) + work_events_result.get('items', [])
+    #events = sorted(events.items('start'))
     formatted_events = [(event['start'].get('dateTime', event['start'].get('date')), # start time or day
          event['end'].get('dateTime', event['end'].get('date')), # end time or day
          event['summary']) for event in events]
-     
+    formatted_events = sorted(formatted_events)
+
     # Generate output text
     response = ''
     for event in formatted_events:
          if re.match(r'^\d{4}-\d{2}-\d{2}$', event[0]):
-             start_date = '{0:%Y-%m-%d}'.format(datetime.strptime(event[1], '%Y-%m-%d'))
-             response += '{0} All Day\n{1}\n\n'.format(start_date, event[2])
+             start_date = '{0:%Y-%m-%d}'.format(datetime.strptime(event[1], '%Y-%m-%d') + timedelta(days=-1))
+             response += '{0} 終日\n {1}\n'.format(start_date, event[2][:9])
          # For all day events
          else:
              start_time = '{0:%m/%d %H:%M}'.format(datetime.strptime(event[0], '%Y-%m-%dT%H:%M:%S+09:00'))
              end_time = '{0:%H:%M}'.format(datetime.strptime(event[1], '%Y-%m-%dT%H:%M:%S+09:00'))
-             response += '{0} ~ {1}\n{2}\n'.format(start_time, end_time, event[2][:9])
+             response += '{0}~{1}\n {2}\n'.format(start_time, end_time, event[2][:9])
     response = response.rstrip('\n')
-    draw.text((2, 20), response, inky_display.WHITE, font=font)
 
+    return response
 
+# イベントが更新されてなかったら終了
+my_events = get_events();
+
+f_path = '/home/pi/pi-calendar/current_events.txt'
+
+mtime =  os.path.getmtime(Path(f_path))
+mod_date = datetime.fromtimestamp(mtime)
+now = datetime.now()
+
+if not os.path.isfile(f_path):
+    with open(f_path, 'w'):
+        pass
+
+with open(f_path) as f:
+    current = f.read()
+    if ((mod_date.year, mod_date.month, mod_date.day) == (now.year, now.month, now.day)) :
+            if (current == my_events):
+                quit()
+
+with open(f_path, mode='w') as f:
+   f.write(my_events)
 
 # Load our sprite sheet and prepare a mask
 text = Image.open(os.path.join(PATH, "resources/calendar.png"))
@@ -146,7 +175,6 @@ draw = ImageDraw.Draw(img)
 # Grab the current date, and prepare our calendar
 cal = calendar.Calendar()
 cal.setfirstweekday(calendar.SUNDAY)
-now = datetime.now()
 dates = cal.monthdatescalendar(now.year, now.month)
 
 col_w = 20
@@ -205,10 +233,10 @@ for x in range(cols):
     o_x += cal_x
 
     crop_x = 2 + (16 * x) - 16
-    
+
     if (x == 0):
         crop_x = 2 + (16 * 6)
-        
+
     # Crop the relevant day name from our text image
     crop_region = ((crop_x, 0, crop_x + 16, 9))
     day_mask = text_mask.crop(crop_region)
@@ -240,12 +268,14 @@ for row, week in enumerate(dates):
             draw.rectangle((x, y, x + col_w - 1, y + col_h - 1), fill=inky_display.WHITE)
             if ( datetime(day.year, day.month, day.day).strftime("%Y-%m-%d") in holidays):
                 print_number((x + 3, y + 5), day.day, inky_display.RED)
+            elif (day.weekday() > 4):
+                print_number((x + 3, y + 5), day.day, inky_display.RED)
             else:
                 print_number((x + 3, y + 5), day.day, inky_display.BLACK)
 
         elif ( datetime(day.year, day.month, day.day).strftime("%Y-%m-%d") in holidays):
             print_number((x + 3, y + 5), day.day, inky_display.RED)
-            
+
         elif ((day.month) == (now.month) and day.weekday() > 4):
             print_number((x + 3, y + 5), day.day, inky_display.RED)
 
@@ -256,7 +286,8 @@ for row, week in enumerate(dates):
 #            print_number((x + 3, y + 3), day.day, inky_display.WHITE if day.month == now.month else inky_display.RED)
             print_number((x + 3, y + 5), day.day, inky_display.WHITE)
 
-get_events();
+# イベントを書き込み
+draw.text((2, 22), my_events, inky_display.WHITE, font=font)
 
 # Display the completed calendar on Inky pHAT
 inky_display.set_image(img)
